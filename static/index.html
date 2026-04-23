@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dataverse Publishing Agent</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary:   #a51c30;   /* Harvard crimson */
+      --primary-d: #7a1424;
+      --accent:    #1a73e8;
+      --bg:        #f5f6fa;
+      --surface:   #ffffff;
+      --border:    #e0e0e8;
+      --text:      #1a1a2e;
+      --muted:     #6b7280;
+      --success:   #16a34a;
+      --warning:   #d97706;
+      --error:     #dc2626;
+      --radius:    10px;
+      --shadow:    0 2px 12px rgba(0,0,0,.08);
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Layout ───────────────────────────────────────────────────────────── */
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      height: 64px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+      position: sticky; top: 0; z-index: 100;
+    }
+    header .logo { font-size: 1.4rem; font-weight: 700; letter-spacing: -.5px; }
+    header .subtitle { font-size: .85rem; opacity: .8; margin-left: auto; }
+    .badge {
+      background: rgba(255,255,255,.2);
+      border-radius: 20px;
+      padding: 2px 10px;
+      font-size: .75rem;
+      font-weight: 600;
+    }
+
+    .layout { display: flex; min-height: calc(100vh - 64px); }
+
+    /* ── Sidebar ──────────────────────────────────────────────────────────── */
+    nav {
+      width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 1.5rem 0;
+      flex-shrink: 0;
+      position: sticky;
+      top: 64px;
+      height: calc(100vh - 64px);
+      overflow-y: auto;
+    }
+    nav .nav-section { padding: .25rem 1rem .25rem 1.25rem; font-size: .7rem;
+      font-weight: 700; text-transform: uppercase; color: var(--muted);
+      letter-spacing: .08em; margin-top: 1rem; }
+    nav a {
+      display: flex; align-items: center; gap: .6rem;
+      padding: .55rem 1.25rem;
+      color: var(--text); text-decoration: none; font-size: .9rem;
+      border-left: 3px solid transparent; transition: all .15s;
+    }
+    nav a:hover  { background: var(--bg); color: var(--primary); }
+    nav a.active { border-left-color: var(--primary); color: var(--primary);
+      background: #fef2f2; font-weight: 600; }
+    nav .icon { font-size: 1rem; width: 20px; text-align: center; }
+
+    /* ── Main ─────────────────────────────────────────────────────────────── */
+    main { flex: 1; padding: 2rem; max-width: 860px; }
+
+    /* ── Cards ────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      margin-bottom: 1.5rem;
+      box-shadow: var(--shadow);
+    }
+    .card h2 {
+      font-size: 1.15rem; font-weight: 700; margin-bottom: .3rem;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .card .desc { color: var(--muted); font-size: .88rem; margin-bottom: 1.25rem; }
+
+    /* ── Forms ────────────────────────────────────────────────────────────── */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
+    .form-grid.full { grid-template-columns: 1fr; }
+    label { display: block; font-size: .82rem; font-weight: 600;
+      color: var(--muted); margin-bottom: .3rem; }
+    input[type=text], input[type=email], select, textarea {
+      width: 100%; padding: .6rem .85rem; border: 1px solid var(--border);
+      border-radius: 6px; font-size: .9rem; font-family: inherit;
+      background: #fafafa; transition: border-color .15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--primary); background: #fff;
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* File drop zone */
+    .dropzone {
+      border: 2px dashed var(--border); border-radius: 8px;
+      padding: 2rem; text-align: center; cursor: pointer;
+      transition: all .2s; background: #fafafa;
+      grid-column: 1 / -1;
+    }
+    .dropzone:hover, .dropzone.drag-over {
+      border-color: var(--primary); background: #fef2f2;
+    }
+    .dropzone input { display: none; }
+    .dropzone .dz-icon { font-size: 2rem; }
+    .dropzone .dz-text { color: var(--muted); font-size: .88rem; margin-top: .4rem; }
+    .dropzone .dz-file { font-weight: 600; color: var(--primary); margin-top: .5rem;
+      font-size: .9rem; }
+
+    /* ── Buttons ──────────────────────────────────────────────────────────── */
+    .btn-row { display: flex; gap: .75rem; margin-top: 1.25rem; flex-wrap: wrap; }
+    button {
+      padding: .6rem 1.4rem; border: none; border-radius: 6px;
+      font-size: .9rem; font-weight: 600; cursor: pointer; transition: all .15s;
+      display: inline-flex; align-items: center; gap: .4rem;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-d); }
+    .btn-secondary { background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--border); }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-accent:hover { opacity: .9; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .spinner { display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+      border-radius: 50%; animation: spin .6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Result box ───────────────────────────────────────────────────────── */
+    .result-box {
+      margin-top: 1.25rem; border-radius: 8px; overflow: hidden;
+      border: 1px solid var(--border); display: none;
+    }
+    .result-box.visible { display: block; }
+    .result-header {
+      padding: .6rem 1rem; font-size: .8rem; font-weight: 700;
+      letter-spacing: .05em; text-transform: uppercase;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .result-header.success { background: #dcfce7; color: #15803d; }
+    .result-header.error   { background: #fee2e2; color: #b91c1c; }
+    .result-header.info    { background: #eff6ff; color: #1e40af; }
+    .result-body {
+      padding: 1rem; background: #1e1e2e; color: #e2e8f0;
+      font-family: 'Courier New', monospace; font-size: .82rem;
+      max-height: 320px; overflow-y: auto; white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* ── Steps tracker ────────────────────────────────────────────────────── */
+    .steps { margin-top: 1rem; display: flex; flex-direction: column; gap: .5rem; }
+    .step {
+      display: flex; align-items: center; gap: .75rem;
+      padding: .6rem .85rem; border-radius: 6px;
+      font-size: .88rem; border: 1px solid var(--border);
+    }
+    .step.success { background: #f0fdf4; border-color: #bbf7d0; }
+    .step.failed  { background: #fef2f2; border-color: #fecaca; }
+    .step.warning { background: #fffbeb; border-color: #fde68a; }
+    .step.skipped { background: #f8fafc; color: var(--muted); }
+    .step .step-icon { font-size: 1.1rem; }
+    .step .step-name { font-weight: 600; min-width: 160px; }
+    .step .step-detail { color: var(--muted); font-size: .82rem; }
+
+    /* ── Search results ───────────────────────────────────────────────────── */
+    .search-results { display: flex; flex-direction: column; gap: .75rem; margin-top: 1rem; }
+    .search-item {
+      border: 1px solid var(--border); border-radius: 8px; padding: .85rem 1rem;
+      background: var(--surface);
+    }
+    .search-item a { color: var(--accent); font-weight: 600; text-decoration: none; }
+    .search-item a:hover { text-decoration: underline; }
+    .search-item .meta { font-size: .8rem; color: var(--muted); margin-top: .25rem; }
+
+    /* ── Chat ─────────────────────────────────────────────────────────────── */
+    .chat-window {
+      border: 1px solid var(--border); border-radius: 8px;
+      height: 340px; overflow-y: auto; padding: 1rem;
+      background: #fafafa; display: flex; flex-direction: column; gap: .75rem;
+    }
+    .chat-msg { max-width: 80%; padding: .65rem 1rem; border-radius: 12px;
+      font-size: .88rem; line-height: 1.5; }
+    .chat-msg.user { background: var(--primary); color: #fff;
+      align-self: flex-end; border-bottom-right-radius: 2px; }
+    .chat-msg.agent { background: var(--surface); border: 1px solid var(--border);
+      align-self: flex-start; border-bottom-left-radius: 2px; }
+    .chat-msg.typing { color: var(--muted); font-style: italic; }
+    .chat-input-row { display: flex; gap: .5rem; margin-top: .75rem; }
+    .chat-input-row input { flex: 1; }
+
+    /* ── Health indicator ─────────────────────────────────────────────────── */
+    .health-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      display: inline-block; margin-right: 5px;
+    }
+    .health-dot.ok     { background: #16a34a; box-shadow: 0 0 5px #16a34a; }
+    .health-dot.warn   { background: #d97706; }
+    .health-dot.error  { background: #dc2626; }
+
+    /* ── Sections (tabs) ──────────────────────────────────────────────────── */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ── Responsive ───────────────────────────────────────────────────────── */
+    @media (max-width: 640px) {
+      nav { display: none; }
+      .form-grid { grid-template-columns: 1fr; }
+      main { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header>
+  <span class="logo">🌿 Dataverse Agent</span>
+  <span class="badge">Harvard Dataverse</span>
+  <span class="subtitle" id="healthStatus">Checking connection…</span>
+</header>
+
+<div class="layout">
+
+<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+<nav id="sidebar">
+  <div class="nav-section">Publish</div>
+  <a href="#" class="active" onclick="showSection('publish', this)">
+    <span class="icon">🚀</span> Publish Dataset
+  </a>
+  <a href="#" onclick="showSection('metadata', this)">
+    <span class="icon">🏷️</span> Preview Metadata
+  </a>
+  <div class="nav-section">Manage</div>
+  <a href="#" onclick="showSection('search', this)">
+    <span class="icon">🔍</span> Search
+  </a>
+  <a href="#" onclick="showSection('info', this)">
+    <span class="icon">📄</span> Dataset Info
+  </a>
+  <div class="nav-section">Agent</div>
+  <a href="#" onclick="showSection('chat', this)">
+    <span class="icon">💬</span> Agent Chat
+  </a>
+  <div class="nav-section">Docs</div>
+  <a href="/docs" target="_blank">
+    <span class="icon">📖</span> Swagger UI
+  </a>
+  <a href="/redoc" target="_blank">
+    <span class="icon">📑</span> ReDoc
+  </a>
+</nav>
+
+<!-- ── Main content ─────────────────────────────────────────────────────────── -->
+<main>
+
+  <!-- ── PUBLISH ──────────────────────────────────────────────────────────── -->
+  <div class="section active" id="sec-publish">
+    <div class="card">
+      <h2>🚀 Publish Dataset to Harvard Dataverse</h2>
+      <p class="desc">Upload your file and fill in your details. The agent will auto-generate metadata using AI and publish your dataset — or use dry run to preview first.</p>
+
+      <div class="form-grid">
+        <!-- Drop zone -->
+        <div class="dropzone" id="publishDropzone" onclick="document.getElementById('publishFile').click()"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="handleDrop(event,'publishFile','publishDropzone')">
+          <input type="file" id="publishFile" accept=".csv,.txt,.pdf,.md"
+                 onchange="showFileName(this,'publishDropzone')">
+          <div class="dz-icon">📂</div>
+          <div class="dz-text">Drag & drop your dataset here, or click to browse</div>
+          <div class="dz-text">Supports: CSV, TXT, PDF, MD</div>
+          <div class="dz-file" id="publishFileName"></div>
+        </div>
+
+        <div>
+          <label>Your Full Name *</label>
+          <input type="text" id="pub-author" placeholder="e.g. Jane Smith" />
+        </div>
+        <div>
+          <label>Contact Email *</label>
+          <input type="email" id="pub-email" placeholder="jane@university.edu" />
+        </div>
+        <div>
+          <label>Affiliation</label>
+          <input type="text" id="pub-affiliation" placeholder="e.g. Harvard University" />
+        </div>
+        <div>
+          <label>Dataverse Alias</label>
+          <input type="text" id="pub-alias" placeholder="root" value="root" />
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="publishDataset(true)">
+          🧪 Dry Run (test without publishing)
+        </button>
+        <button class="btn-primary" onclick="publishDataset(false)" id="publishBtn">
+          🚀 Publish to Dataverse
+        </button>
+      </div>
+    </div>
+
+    <div class="result-box" id="publishResult">
+      <div class="result-header" id="publishResultHeader"></div>
+      <div class="steps" id="publishSteps"></div>
+      <div class="result-body" id="publishResultBody" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ── METADATA PREVIEW ─────────────────────────────────────────────────── -->
+  <div class="section" id="sec-metadata">
+    <div class="card">
+      <h2>🏷️ Preview Auto-Generated Metadata</h2>
+      <p class="desc">Upload any dataset file to see what metadata the AI would generate — without creating anything in Dataverse. Great for reviewing before publishing.</p>
+
+      <div class="form-grid">
+        <div class="dropzone" id="metaDropzone" onclick="document.getElementById('metaFile').click()"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')"
+             ondrop="handleDrop(event,'metaFile','metaDropzone')">
+          <input type="file" id="metaFile" accept=".csv,.txt,.pdf,.md"
+                 onchange="showFileName(this,'metaDropzone')">
+          <div class="dz-icon">📂</div>
+          <div class="dz-text">Drop your file here to preview its metadata</div>
+          <div class="dz-file" id="metaFileName"></div>
+        </div>
+        <div>
+          <label>Author Name (optional)</label>
+          <input type="text" id="meta-author" placeholder="Your name" />
+        </div>
+        <div>
+          <label>Contact Email (optional)</label>
+          <input type="email" id="meta-email" placeholder="your@email.com" />
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-primary" onclick="previewMetadata()" id="metaBtn">
+          ✨ Generate Metadata
+        </button>
+      </div>
+    </div>
+
+    <div class="result-box" id="metaResult">
+      <div class="result-header info">✅ Generated Metadata</div>
+      <div class="result-body" id="metaResultBody"></div>
+    </div>
+  </div>
+
+  <!-- ── SEARCH ───────────────────────────────────────────────────────────── -->
+  <div class="section" id="sec-search">
+    <div class="card">
+      <h2>🔍 Search Harvard Dataverse</h2>
+      <p class="desc">Search for existing datasets before publishing to avoid duplicates.</p>
+
+      <div class="form-grid full">
+        <div>
+          <label>Search Query</label>
+          <input type="text" id="search-query" placeholder="e.g. wood fuel biomass USA"
+                 onkeydown="if(event.key==='Enter') searchDataverse()" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="searchDataverse()">🔍 Search</button>
+      </div>
+    </div>
+
+    <div class="search-results" id="searchResults"></div>
+  </div>
+
+  <!-- ── DATASET INFO ──────────────────────────────────────────────────────── -->
+  <div class="section" id="sec-info">
+    <div class="card">
+      <h2>📄 Dataset Info</h2>
+      <p class="desc">Enter a dataset persistent ID (DOI) or numeric ID to view its current status and files.</p>
+
+      <div class="form-grid full">
+        <div>
+          <label>Dataset ID</label>
+          <input type="text" id="info-id" placeholder="doi:10.7910/DVN/XXXXX or numeric ID"
+                 onkeydown="if(event.key==='Enter') getDatasetInfo()" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn-primary" onclick="getDatasetInfo()">📄 Get Info</button>
+        <button class="btn-secondary" onclick="publishExisting()">📢 Publish this Dataset</button>
+      </div>
+    </div>
+
+    <div class="result-box" id="infoResult">
+      <div class="result-header info">Dataset Information</div>
+      <div class="result-body" id="infoResultBody"></div>
+    </div>
+  </div>
+
+  <!-- ── AGENT CHAT ────────────────────────────────────────────────────────── -->
+  <div class="section" id="sec-chat">
+    <div class="card">
+      <h2>💬 Agent Chat</h2>
+      <p class="desc">Talk to the AI agent in plain English. It will figure out what to do and call the right APIs automatically.</p>
+
+      <div class="chat-window" id="chatWindow">
+        <div class="chat-msg agent">
+          👋 Hello! I'm your Harvard Dataverse publishing agent.<br><br>
+          You can ask me things like:<br>
+          • "Search for biomass datasets"<br>
+          • "What datasets exist about US wood fuel?"<br>
+          • "Check the status of dataset doi:10.7910/DVN/XXXXX"
+        </div>
+      </div>
+
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="Ask the agent anything…"
+               onkeydown="if(event.key==='Enter') sendChat()" />
+        <button class="btn-primary" onclick="sendChat()">Send ➤</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<!-- ── JavaScript ───────────────────────────────────────────────────────────── -->
+<script>
+const API = '/api/v1';
+let chatSessionId = null;
+
+// ── Navigation ──────────────────────────────────────────────────────────────
+function showSection(name, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+  document.getElementById('sec-' + name).classList.add('active');
+  el.classList.add('active');
+  return false;
+}
+
+// ── Health check ─────────────────────────────────────────────────────────────
+async function checkHealth() {
+  const el = document.getElementById('healthStatus');
+  try {
+    const r = await fetch(`${API}/health`);
+    const d = await r.json();
+    const ok = d.openai_configured && d.dataverse_configured;
+    const dot = ok ? '🟢' : '🟡';
+    el.textContent = `${dot} ${ok ? 'Ready' : 'Missing API keys — check .env'}`;
+  } catch {
+    el.textContent = '🔴 API not reachable';
+  }
+}
+checkHealth();
+
+// ── File drop zone ────────────────────────────────────────────────────────────
+function showFileName(input, zoneId) {
+  const zone = document.getElementById(zoneId);
+  const nameId = zoneId.replace('Dropzone', 'FileName');
+  const nameEl = document.getElementById(nameId);
+  if (input.files[0] && nameEl) {
+    nameEl.textContent = '📎 ' + input.files[0].name;
+    zone.classList.remove('drag-over');
+  }
+}
+
+function handleDrop(event, inputId, zoneId) {
+  event.preventDefault();
+  document.getElementById(zoneId).classList.remove('drag-over');
+  const file = event.dataTransfer.files[0];
+  if (!file) return;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  const input = document.getElementById(inputId);
+  input.files = dt.files;
+  showFileName(input, zoneId);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function setLoading(btnId, loading, label) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.innerHTML = loading
+    ? `<span class="spinner"></span> Working…`
+    : label;
+}
+
+function showResult(boxId, headerEl, headerClass, title, content, useSteps, steps) {
+  const box = document.getElementById(boxId);
+  box.classList.add('visible');
+  if (headerEl) {
+    headerEl.className = `result-header ${headerClass}`;
+    headerEl.textContent = title;
+  }
+  if (useSteps && steps) {
+    renderSteps(steps, boxId);
+  }
+  if (content) {
+    const body = box.querySelector('.result-body');
+    if (body) { body.style.display = 'block'; body.textContent = content; }
+  }
+}
+
+function stepIcon(status) {
+  return { success: '✅', failed: '❌', warning: '⚠️', skipped: '⏭️' }[status] || '⬜';
+}
+
+function renderSteps(steps, boxId) {
+  const container = document.getElementById('publishSteps');
+  if (!container) return;
+  container.innerHTML = steps.map(s => `
+    <div class="step ${s.status}">
+      <span class="step-icon">${stepIcon(s.status)}</span>
+      <span class="step-name">${s.step.replace(/_/g, ' ')}</span>
+      <span class="step-detail">${s.detail}</span>
+    </div>`).join('');
+}
+
+// ── PUBLISH ───────────────────────────────────────────────────────────────────
+async function publishDataset(dryRun) {
+  const file     = document.getElementById('publishFile').files[0];
+  const author   = document.getElementById('pub-author').value.trim();
+  const email    = document.getElementById('pub-email').value.trim();
+  const affil    = document.getElementById('pub-affiliation').value.trim();
+  const alias    = document.getElementById('pub-alias').value.trim() || 'root';
+
+  if (!file)   { alert('Please select a file.'); return; }
+  if (!author) { alert('Author name is required.'); return; }
+  if (!email)  { alert('Contact email is required.'); return; }
+
+  setLoading('publishBtn', true);
+  document.getElementById('publishResult').classList.remove('visible');
+  document.getElementById('publishSteps').innerHTML = '';
+
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('author_name', author);
+  fd.append('contact_email', email);
+  fd.append('author_affiliation', affil);
+  fd.append('dataverse_alias', alias);
+  fd.append('dry_run', dryRun ? 'true' : 'false');
+
+  try {
+    const r = await fetch(`${API}/pipeline/publish`, { method: 'POST', body: fd });
+    const d = await r.json();
+
+    const header = document.getElementById('publishResultHeader');
+    const box    = document.getElementById('publishResult');
+    box.classList.add('visible');
+
+    const ok = d.success || r.ok;
+    header.className = `result-header ${ok ? 'success' : 'error'}`;
+    header.textContent = ok
+      ? (dryRun ? '✅ Dry run complete — dataset was NOT published' : `✅ Published! ID: ${d.persistent_id}`)
+      : `❌ Failed: ${d.detail || d.message}`;
+
+    if (d.steps) renderSteps(d.steps, 'publishResult');
+
+    if (d.public_url) {
+      const body = document.getElementById('publishResultBody');
+      body.style.display = 'block';
+      body.textContent = `Public URL: ${d.public_url}\nPersistent ID: ${d.persistent_id}`;
+    }
+  } catch (e) {
+    showResult('publishResult', document.getElementById('publishResultHeader'),
+      'error', `❌ Error: ${e.message}`, null, false);
+  } finally {
+    setLoading('publishBtn', false, '🚀 Publish to Dataverse');
+  }
+}
+
+// ── METADATA PREVIEW ──────────────────────────────────────────────────────────
+async function previewMetadata() {
+  const file   = document.getElementById('metaFile').files[0];
+  const author = document.getElementById('meta-author').value.trim();
+  const email  = document.getElementById('meta-email').value.trim();
+
+  if (!file) { alert('Please select a file.'); return; }
+
+  setLoading('metaBtn', true, '✨ Generate Metadata');
+  document.getElementById('metaResult').classList.remove('visible');
+
+  const fd = new FormData();
+  fd.append('file', file);
+  if (author) fd.append('author_name', author);
+  if (email)  fd.append('contact_email', email);
+
+  try {
+    const r = await fetch(`${API}/metadata/preview`, { method: 'POST', body: fd });
+    const d = await r.json();
+
+    const box  = document.getElementById('metaResult');
+    const body = document.getElementById('metaResultBody');
+    box.classList.add('visible');
+
+    if (d.success) {
+      const m = d.metadata;
+      body.textContent = [
+        `Title:              ${m.title}`,
+        `Subject:            ${m.subject}`,
+        `Description:        ${m.description}`,
+        `Keywords:           ${m.keywords.join(', ')}`,
+        `Geographic Coverage:${m.geographic_coverage}`,
+        `Time Period:        ${m.time_period_start} – ${m.time_period_end}`,
+        `Data Source:        ${m.data_source}`,
+        `License:            ${m.license}`,
+        '',
+        '── Full Dataverse Schema (JSON) ──',
+        JSON.stringify(d.dataverse_schema, null, 2),
+      ].join('\n');
+    } else {
+      body.textContent = `Error: ${d.detail || JSON.stringify(d)}`;
+    }
+  } catch (e) {
+    document.getElementById('metaResultBody').textContent = `Error: ${e.message}`;
+    document.getElementById('metaResult').classList.add('visible');
+  } finally {
+    setLoading('metaBtn', false, '✨ Generate Metadata');
+  }
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+async function searchDataverse() {
+  const q = document.getElementById('search-query').value.trim();
+  if (!q) { alert('Enter a search query.'); return; }
+
+  const container = document.getElementById('searchResults');
+  container.innerHTML = '<p style="color:var(--muted);padding:.5rem">Searching…</p>';
+
+  try {
+    const r = await fetch(`${API}/datasets/search?q=${encodeURIComponent(q)}&max_results=8`);
+    const d = await r.json();
+
+    if (!d.results || d.results.length === 0) {
+      container.innerHTML = `<div class="card"><p>No datasets found for "<strong>${q}</strong>".</p></div>`;
+      return;
+    }
+
+    container.innerHTML = `<p style="color:var(--muted);font-size:.85rem;padding:.25rem 0">
+      ${d.total_results} result(s) for "<strong>${q}</strong>"</p>` +
+      d.results.map(item => `
+        <div class="search-item">
+          <a href="${item.url}" target="_blank">${item.name}</a>
+          <div class="meta">
+            ${item.published_at ? `Published: ${item.published_at}` : ''}
+            ${item.description ? `<br>${item.description}` : ''}
+          </div>
+        </div>`).join('');
+  } catch (e) {
+    container.innerHTML = `<div class="card"><p>Error: ${e.message}</p></div>`;
+  }
+}
+
+// ── DATASET INFO ──────────────────────────────────────────────────────────────
+async function getDatasetInfo() {
+  const id = document.getElementById('info-id').value.trim();
+  if (!id) { alert('Enter a dataset ID.'); return; }
+
+  document.getElementById('infoResult').classList.remove('visible');
+
+  try {
+    const r = await fetch(`${API}/datasets/${encodeURIComponent(id)}`);
+    const d = await r.json();
+    const body = document.getElementById('infoResultBody');
+
+    if (d.success) {
+      body.textContent = [
+        `Title:      ${d.title}`,
+        `Status:     ${d.status}`,
+        `Files (${d.file_count}):`,
+        ...d.files.map(f => `  • ${f}`),
+      ].join('\n');
+    } else {
+      body.textContent = `Error: ${d.detail || JSON.stringify(d)}`;
+    }
+    document.getElementById('infoResult').classList.add('visible');
+  } catch (e) {
+    document.getElementById('infoResultBody').textContent = `Error: ${e.message}`;
+    document.getElementById('infoResult').classList.add('visible');
+  }
+}
+
+async function publishExisting() {
+  const id = document.getElementById('info-id').value.trim();
+  if (!id) { alert('Enter a dataset ID first.'); return; }
+  if (!confirm(`Publish dataset "${id}"? This will make it publicly visible.`)) return;
+
+  try {
+    const r = await fetch(`${API}/datasets/${encodeURIComponent(id)}/publish`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ version_type: 'major' }),
+    });
+    const d = await r.json();
+    const body = document.getElementById('infoResultBody');
+    body.textContent = d.success
+      ? `✅ Published!\nURL: ${d.public_url}`
+      : `❌ Error: ${d.detail || d.message}`;
+    document.getElementById('infoResult').classList.add('visible');
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+
+// ── AGENT CHAT ────────────────────────────────────────────────────────────────
+function appendChat(text, role) {
+  const win = document.getElementById('chatWindow');
+  const msg = document.createElement('div');
+  msg.className = `chat-msg ${role}`;
+  msg.textContent = text;
+  win.appendChild(msg);
+  win.scrollTop = win.scrollHeight;
+  return msg;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  appendChat(text, 'user');
+  const typing = appendChat('Thinking…', 'agent typing');
+
+  try {
+    const r = await fetch(`${API}/agent/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, session_id: chatSessionId }),
+    });
+    const d = await r.json();
+    chatSessionId = d.session_id;
+    typing.remove();
+    appendChat(d.answer || d.detail || 'No response.', 'agent');
+  } catch (e) {
+    typing.remove();
+    appendChat(`Error: ${e.message}`, 'agent');
+  }
+}
+</script>
+</body>
+</html>
